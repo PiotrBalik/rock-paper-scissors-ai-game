@@ -40,7 +40,7 @@ class HandDetector:
     
     def _extract_hands_by_side(self, results):
         hands_by_side = {}
-        now = self.filter.check_seen()
+        now = self.landmark_filter.check_seen()
 
         if not results.multi_hand_landmarks or not results.multi_handedness:
             return hands_by_side

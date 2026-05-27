@@ -1,9 +1,9 @@
 import time, math
-from collections import defaultdict
-#discussions: ignore small jitters completely if dx<TH -> dx=0
+#TODO discussions: ignore small jitters completely if dx<TH -> dx=0
+#from collections import defaultdict #can help with nonexistent keys, not needed?
 
 class BaseFilter:
-  def __init__(self, timeout=0.5, n_landmarks=21):
+  def __init__(self, timeout=1.0, n_landmarks=21):
     self.timeout = timeout #for forgetting state
     self.n_landmarks = n_landmarks
 
@@ -49,11 +49,18 @@ class BaseFilter:
 
     return smoothed
 
+  def _smooth_point(self, filter_state, x, y, z, t):
+    return (
+      self._filter_scalar(filter_state['x'], x, t), #state.setdefault("x", {})
+      self._filter_scalar(filter_state['y'], y, t),
+      self._filter_scalar(filter_state['z'], z, t),
+    )
+
   #base filter wont run xd
   def _init_filters(self):
     raise NotImplementedError
 
-  def _smooth_point(self, state, x, y, z, t):
+  def _filter_scalar(self, state, x, t):
     raise NotImplementedError
 
 class OneEuroFilter(BaseFilter):
@@ -70,24 +77,21 @@ class OneEuroFilter(BaseFilter):
     self.min_cutoff = min_cutoff
     self.beta = beta
     self.d_cutoff = d_cutoff
+    self._init_filters()
 
   def _init_filters(self):
-    # one state per landmark
+    #one state per landmark
     return [self._make_state() for _ in range(self.n_landmarks)]
 
   def _make_state(self):
-    return {
-        "x_prev": None,
-        "dx_prev": 0.0,
-        "t_prev": None
-    }
+    return { i:{"x_prev": None,"dx_prev": 0.0,"t_prev": None} for i in ['x','y','z']}
 
   def _alpha(self, cutoff, dt):
     tau = 1.0 / (2 * math.pi * cutoff)
     return 1.0 / (1.0 + tau / dt)
 
   def _filter_scalar(self, state, x, t):
-    if state["t_prev"] is None:
+    if state["x_prev"] is None:
       state["t_prev"] = t
       state["x_prev"] = x
       return x
@@ -112,28 +116,23 @@ class OneEuroFilter(BaseFilter):
 
     return x_hat
 
-  def _smooth_point(self, state, x, y, z, t):
-    return (
-      self._filter_scalar(state.setdefault("x", {}), x, t),
-      self._filter_scalar(state.setdefault("y", {}), y, t),
-      self._filter_scalar(state.setdefault("z", {}), z, t),
-    )
-
 class SimpleFilter(BaseFilter):
   def __init__(self, alpha=0.9, **kwargs):
     super().__init__(**kwargs)
     self.alpha = alpha
+    self._init_filters()
 
   def _init_filters(self):
-    # one state per landmark
+    #one state per landmark
     return [self._make_state() for _ in range(self.n_landmarks)]
 
   def _make_state(self):
-    return {
-      "x_prev": None
-    }
+    #list comprehension of dictionary items
+    #TODO? vectorize assuming landmarks is array [Nx3]
+    return { i:{"x_prev": None} for i in ['x','y','z']}
 
-  def _filter_scalar(self, state, x):
+  def _filter_scalar(self, state, x, t):
+    #print(state)
     if state["x_prev"] is None:
       state["x_prev"] = x
       return x
@@ -143,17 +142,9 @@ class SimpleFilter(BaseFilter):
 
     return x_hat
 
-  def _smooth_point(self, state, x, y, z, t):
-    return (
-      self._filter_scalar(state.setdefault("x", {}), x),
-      self._filter_scalar(state.setdefault("y", {}), y),
-      self._filter_scalar(state.setdefault("z", {}), z),
-    )
-
 class NoFilter(BaseFilter):
-  def __init__(self, alpha=0.9, **kwargs):
+  def __init__(self, **kwargs):
     super().__init__(**kwargs)
-    self.alpha = alpha
 
   def _init_filters(self):
     pass

@@ -61,6 +61,7 @@ class GameController:
                 )
                 
                 #ensure next capture loop starts at desired FPS
+                #TODO print fps performance, make adaptive? ContentManager seems to be doing similar task
                 t_elapsed = time.perf_counter() - t_start
                 sleep_time = FPS_TIME - t_elapsed
                 if sleep_time > 0:
